@@ -1,11 +1,16 @@
 package euphoria;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import euphoria.types.PacketType;
+import euphoria.types.Snowflake;
+
+import java.util.UUID;
 
 public class EuphoriaPacket {
-    private static final Gson encoder = new Gson();
+    private static final Gson encoder = new GsonBuilder().registerTypeHierarchyAdapter(Snowflake.class,new Snowflake.SnowflakeAdapter()).create();
     /**
      * optional 	client-generated id for associating replies with commands
      */
@@ -31,8 +36,14 @@ public class EuphoriaPacket {
      */
     public String throttled_reason;
 
-    public EuphoriaPacket(String type, Object data){
-        this.type=type;
+    public EuphoriaPacket(PacketType type, Object data){
+        this.type=type.getName();
+        this.data=encoder.toJsonTree(data).getAsJsonObject();
+    }
+
+    public EuphoriaPacket(String id, PacketType type, Object data){
+        this.id=id;
+        this.type=type.getName();
         this.data=encoder.toJsonTree(data).getAsJsonObject();
     }
 }

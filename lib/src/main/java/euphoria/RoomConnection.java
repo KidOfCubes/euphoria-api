@@ -2,16 +2,22 @@ package euphoria;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 
 import com.google.gson.JsonSyntaxException;
 import euphoria.packet_types.nick;
 import euphoria.packet_types.ping_reply;
+import euphoria.types.Message;
+import euphoria.types.PacketType;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
 public class RoomConnection extends WebSocketClient {
 
-
+    HashMap<String,CompletableFuture<EuphoriaPacket>> pendingReplies = new HashMap<>();
     EuphoriaBot bot;
     boolean loggedIn=false;
 
@@ -24,7 +30,6 @@ public class RoomConnection extends WebSocketClient {
 
     @Override
     public void onOpen(ServerHandshake handshakedata) {
-//        send("test");
         System.out.println("new connection opened");
     }
 
@@ -43,29 +48,54 @@ public class RoomConnection extends WebSocketClient {
                 onPacket(packet);
             }
         }catch (JsonSyntaxException e){
+            System.out.println(e.getMessage());
             System.out.println("Received malformed packet "+message);
         }
     }
     public void onPacket(EuphoriaPacket packet){
-        switch (packet.type.toLowerCase()) {
-            case "ping-event" ->
-                    sendPacket(new EuphoriaPacket("ping-reply", new ping_reply(packet.data.get("time").getAsLong())));
-            case "hello-event" -> {
+        if(packet.id!=null){
+            if (pendingReplies.containsKey(packet.id)) {
+                pendingReplies.get(packet.id).complete(packet);
+                pendingReplies.remove(packet.id);
+            }
+        }
+        switch (PacketType.fromName(packet.type)) {
+            case PING_EVENT ->
+                    sendPacket(new EuphoriaPacket(PacketType.PING_REPLY, new ping_reply(packet.data.get("time").getAsLong())));
+            case HELLO_EVENT -> {
                 loggedIn = true;
+                setName(bot.name);
                 bot.onJoinRoom(this);
             }
-            case "send-event" -> bot.onMessage(packet, this);
-            default -> System.out.println("Unrecognized packet: " + bot.gson.toJson(packet));
+            case SEND_EVENT -> bot.onMessage(bot.gson.fromJson(packet.data, Message.class), this);
+            default -> System.out.println("Unimplemented/unrecognized packet: " + bot.gson.toJson(packet)+" with type "+PacketType.fromName(packet.type));
         }
 
 
     }
     public void setName(String name){
-        sendPacket(new EuphoriaPacket("nick",new nick(name)));
+        sendPacket(new EuphoriaPacket(PacketType.NICK,new nick(name)));
     }
-    public void sendPacket(EuphoriaPacket packet){
+    void sendPacket(EuphoriaPacket packet){
         System.out.println("sent packet "+bot.gson.toJson(packet));
         send(bot.gson.toJson(packet));
+    }
+
+    CompletableFuture<EuphoriaPacket> sendCommand(PacketType type, Object data){
+        //todo check if command type
+        EuphoriaPacket packet = new EuphoriaPacket(UUID.randomUUID().toString(),type,data);
+        pendingReplies.put(packet.id, new CompletableFuture<>());
+        sendPacket(packet);
+        return pendingReplies.get(packet.id);
+    }
+
+    /**
+     * Sends a Message
+     * @param message Message to be sent
+     * @return Server replied message object
+     */
+    public CompletableFuture<Message> sendEuphoriaMessage(Message message){
+        return sendCommand(PacketType.SEND,message).thenApply(packet -> bot.gson.fromJson(packet.data, Message.class));
     }
 
     @Override
