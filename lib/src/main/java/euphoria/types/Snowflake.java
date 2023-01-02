@@ -4,12 +4,17 @@ import com.google.gson.*;
 
 import java.lang.reflect.Type;
 import java.util.Arrays;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Snowflake {
     public static final int length = 13;
     private static final String hexRegex = "^[\\dA-Za-z]+$";
     char[] chars;
+
     public Snowflake(String snowflakeText){
+        if(snowflakeText==null){
+            throw new NullPointerException("Snowflake text was null");
+        }
         if(snowflakeText.length()!=length){
             throw new IllegalArgumentException("Snowflake text "+snowflakeText+" doesn't match length "+length);
         }
@@ -27,6 +32,14 @@ public class Snowflake {
     @Override
     public int hashCode() {
         return Arrays.hashCode(chars);
+    }
+
+    //todo implement snowflake making from time like euphoria
+
+
+    public static Snowflake random() {
+        String thing = Long.toUnsignedString(ThreadLocalRandom.current().nextLong(),36);
+        return new Snowflake("0".repeat(length-thing.length())+thing);
     }
 
     @Override

@@ -13,4 +13,6 @@ public class SessionView {
     public boolean is_manager;
     public String client_address;
     public String real_client_address;
+
+
 }

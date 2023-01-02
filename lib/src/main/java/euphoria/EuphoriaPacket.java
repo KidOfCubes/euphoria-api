@@ -2,12 +2,10 @@ package euphoria;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import euphoria.types.PacketType;
 import euphoria.types.Snowflake;
 
-import java.util.UUID;
 
 public class EuphoriaPacket {
     private static final Gson encoder = new GsonBuilder().registerTypeHierarchyAdapter(Snowflake.class,new Snowflake.SnowflakeAdapter()).create();

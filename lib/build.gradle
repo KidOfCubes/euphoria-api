@@ -15,14 +15,15 @@ plugins {
 }
 version = '0.1.0'
 
+sourceCompatibility = 17
+targetCompatibility = 17
+
 repositories {
     // Use Maven Central for resolving dependencies.
     mavenCentral()
 }
 
 dependencies {
-    // Use JUnit Jupiter for testing.
-//    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.1'
 
     api 'org.java-websocket:Java-WebSocket:1.5.3'
     api 'com.google.code.gson:gson:2.10'

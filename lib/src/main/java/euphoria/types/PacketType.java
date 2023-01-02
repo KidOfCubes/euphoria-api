@@ -3,7 +3,8 @@ package euphoria.types;
 import java.util.HashMap;
 import java.util.Map;
 
-public enum PacketType { //todo fully implement in EuphoriaPacket
+//todo fully implement in EuphoriaPacket
+public enum PacketType {
     
     BOUNCE_EVENT("bounce-event"),
     DISCONNECT_EVENT("disconnect-event"),

@@ -2,16 +2,17 @@ package euphoria;
 
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.google.gson.JsonSyntaxException;
+import euphoria.packet_types.hello_event;
 import euphoria.packet_types.nick;
 import euphoria.packet_types.ping_reply;
 import euphoria.types.Message;
 import euphoria.types.PacketType;
+import euphoria.types.SessionView;
+import euphoria.types.Snowflake;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -19,6 +20,8 @@ public class RoomConnection extends WebSocketClient {
 
     HashMap<String,CompletableFuture<EuphoriaPacket>> pendingReplies = new HashMap<>();
     EuphoriaBot bot;
+
+    SessionView sessionView;
     boolean loggedIn=false;
 
 
@@ -28,28 +31,52 @@ public class RoomConnection extends WebSocketClient {
 
     }
 
-    @Override
-    public void onOpen(ServerHandshake handshakedata) {
-        System.out.println("new connection opened");
+    /**
+     * Attempts to retrieve the room from the websockets endpoint URL
+     * (Assuming format of wss://example.com/foo/room/ROOMNAME/bar)
+     * @return The room name if it could be retrieved, or the entire url
+     */
+    public String roomName(){
+        String path = getURI().getRawPath();
+        if(path!=null) {
+            String[] pathArray = path.split("/");
+            String roomName = null;
+            for(int i=0;i<pathArray.length;i++){
+                if(roomName!=null){
+                    roomName=pathArray[i];
+                    break;
+                }
+                if(pathArray[i].equalsIgnoreCase("room")){
+                    roomName="";
+                }
+            }
+            if(roomName!=null){
+                return roomName;
+            }
+        }
+        return getURI().toASCIIString();
     }
+
+    @Override
+    public void onOpen(ServerHandshake handshakedata) {}
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        System.out.println("closed with exit code " + code + " additional info: " + reason);
-
+        if(remote){
+            reconnect();
+        }
     }
 
     @Override
-    public void onMessage(String message) {
-        System.out.println("received message: " + message);
+    public void onMessage(String text) {
         try {
-            EuphoriaPacket packet = bot.gson.fromJson(message, EuphoriaPacket.class);
+            EuphoriaPacket packet = bot.gson.fromJson(text, EuphoriaPacket.class);
             if (packet.type != null) {
                 onPacket(packet);
             }
         }catch (JsonSyntaxException e){
-            System.out.println(e.getMessage());
-            System.out.println("Received malformed packet "+message);
+            e.printStackTrace();
+            System.err.println("Received malformed packet "+text);
         }
     }
     public void onPacket(EuphoriaPacket packet){
@@ -65,10 +92,19 @@ public class RoomConnection extends WebSocketClient {
             case HELLO_EVENT -> {
                 loggedIn = true;
                 setName(bot.name);
+                hello_event event = bot.gson.fromJson(packet.data, hello_event.class);
+                sessionView=event.session;
                 bot.onJoinRoom(this);
             }
-            case SEND_EVENT -> bot.onMessage(bot.gson.fromJson(packet.data, Message.class), this);
-            default -> System.out.println("Unimplemented/unrecognized packet: " + bot.gson.toJson(packet)+" with type "+PacketType.fromName(packet.type));
+            case SEND_EVENT -> {
+                Message message = bot.gson.fromJson(packet.data, Message.class);
+                if(!message.sender.id.equals(sessionView.id)){
+                    bot.onMessage(message, this);
+                }
+            }
+            default -> {
+//                System.out.println("Unimplemented/unrecognized packet: " + bot.gson.toJson(packet)+" with type "+PacketType.fromName(packet.type));
+            }
         }
 
 
@@ -77,13 +113,12 @@ public class RoomConnection extends WebSocketClient {
         sendPacket(new EuphoriaPacket(PacketType.NICK,new nick(name)));
     }
     void sendPacket(EuphoriaPacket packet){
-        System.out.println("sent packet "+bot.gson.toJson(packet));
         send(bot.gson.toJson(packet));
     }
 
     CompletableFuture<EuphoriaPacket> sendCommand(PacketType type, Object data){
         //todo check if command type
-        EuphoriaPacket packet = new EuphoriaPacket(UUID.randomUUID().toString(),type,data);
+        EuphoriaPacket packet = new EuphoriaPacket(Snowflake.random().toString(),type,data);
         pendingReplies.put(packet.id, new CompletableFuture<>());
         sendPacket(packet);
         return pendingReplies.get(packet.id);
@@ -99,9 +134,7 @@ public class RoomConnection extends WebSocketClient {
     }
 
     @Override
-    public void onMessage(ByteBuffer message) {
-        System.out.println("received ByteBuffer");
-    }
+    public void onMessage(ByteBuffer message) {}
 
     @Override
     public void onError(Exception ex) {
