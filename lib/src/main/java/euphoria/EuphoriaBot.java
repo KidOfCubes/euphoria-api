@@ -3,9 +3,7 @@ package euphoria;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import euphoria.types.Message;
-import euphoria.types.PacketType;
 import euphoria.types.Snowflake;
-import org.java_websocket.AbstractWebSocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,21 +19,25 @@ public class EuphoriaBot {
     public final Gson gson = new GsonBuilder()
             .registerTypeHierarchyAdapter(Snowflake.class,new Snowflake.SnowflakeAdapter())
             .create();
-    protected final Map<String,RoomConnection> connections = new HashMap<>();
-    public String name;
+
+    /**
+     * Map of websocket endpoints to connections
+     */
+    public final Map<String,RoomConnection> connections = new HashMap<>();
+    String defaultNickname;
 
     private final Logger log = LoggerFactory.getLogger(EuphoriaBot.class);
 
     //todo figure out this logging stuff
 
-    public EuphoriaBot(String name){
-        this.name=name;
+    public EuphoriaBot(String defaultNickname){
+        this.defaultNickname=defaultNickname;
     }
 
     /**
      * Disconnects and removes all sessions
      */
-    public void stop(){
+    public final void stop(){
         disconnect();
         connections.clear();
     }
@@ -43,20 +45,16 @@ public class EuphoriaBot {
     /**
      * Disconnects from all sessions
      */
-    public void disconnect(){
+    public final void disconnect(){
         connections.values().forEach(connection -> {
             connection.close(1000, "Bot disconnected");
         });
     }
-    public void setName(String name){
-        connections.values().forEach(connection -> setName(name,connection));
-    }
-    public void setName(String name,RoomConnection roomConnection){
-        roomConnection.setName(name);
+    public final void setNickname(String name,RoomConnection roomConnection){
+        roomConnection.setNickname(name);
     }
 
-
-    public void joinRoom(URI serverURI){
+    public final void joinRoom(URI serverURI){
         if(connections.containsKey(serverURI.toString())) {
             if(!connections.get(serverURI.toString()).isOpen()){
                 connections.get(serverURI.toString()).connect();
@@ -67,10 +65,7 @@ public class EuphoriaBot {
             connections.put(serverURI.toString(), connection);
         }
     }
-    public void broadcast(String text){
-        Message message = new Message(text);
-        connections.values().forEach(connection -> connection.sendPacket(new EuphoriaPacket(PacketType.SEND,message)));
-    }
+
     public void onJoinRoom(RoomConnection connection){}
     public void onMessage(Message message,RoomConnection connection){}
 }

@@ -91,7 +91,7 @@ public class RoomConnection extends WebSocketClient {
                     sendPacket(new EuphoriaPacket(PacketType.PING_REPLY, new ping_reply(packet.data.get("time").getAsLong())));
             case HELLO_EVENT -> {
                 loggedIn = true;
-                setName(bot.name);
+                setNickname(bot.defaultNickname);
                 hello_event event = bot.gson.fromJson(packet.data, hello_event.class);
                 sessionView=event.session;
                 bot.onJoinRoom(this);
@@ -109,7 +109,7 @@ public class RoomConnection extends WebSocketClient {
 
 
     }
-    public void setName(String name){
+    public void setNickname(String name){
         sendPacket(new EuphoriaPacket(PacketType.NICK,new nick(name)));
     }
     void sendPacket(EuphoriaPacket packet){
